@@ -1,11 +1,12 @@
 # joblin
-<p align="center">
-	<img src="https://raw.githubusercontent.com/max-matinpalo/joblin/main/assets/JoblinLogo.jpeg" width="128" alt="Logo">
-</p>
 [![npm version](https://img.shields.io/npm/v/joblin)](https://www.npmjs.com/package/joblin)
 [![license](https://img.shields.io/github/license/max-matinpalo/joblin?v=1)](https://github.com/max-matinpalo/joblin/blob/main/LICENSE)
 [![bundle size](https://img.shields.io/bundlephobia/minzip/joblin)](https://bundlephobia.com/package/joblin)
-
+<br>
+<p align="center">
+	<img src="https://raw.githubusercontent.com/max-matinpalo/joblin/main/assets/JoblinLogo.jpeg" width="320" alt="Logo">
+</p>
+<br>
 
 **Multi-core JavaScript, made simple.**   
 Define and call worker functions like normal async functions.
