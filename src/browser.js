@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 const registry = {};
 
 /* Prevent duplicate listeners when register() is called more than once */
@@ -40,6 +42,13 @@ export function setup(path) {
 
 	const jobs = new Map();
 	const worker = new Worker(path, { type: "module" });
+	/*
+	const worker = typeof path === "function"
+	? path()
+	: path?.postMessage
+		? path
+		: new Worker(path, { type: "module" });
+	*/
 
 	const rejectJobs = (error) => {
 		for (const job of jobs.values()) job.reject(error);

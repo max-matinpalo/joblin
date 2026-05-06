@@ -1,7 +1,7 @@
 {
 	"name": "joblin",
-	"version": "0.2.1",
-	"description": "Multi-core JavaScript, made simple.",
+	"version": "0.5.2",
+	"description": "Multicore JavaScript made simple.",
 	"author": "Max Matinpalo",
 	"type": "module",
 	"license": "MIT",
