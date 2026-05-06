@@ -4,7 +4,7 @@
 [![bundle size](https://img.shields.io/bundlephobia/minzip/joblin)](https://bundlephobia.com/package/joblin)
 <br>
 <p align="center">
-	<img src="https://raw.githubusercontent.com/max-matinpalo/joblin/main/assets/JoblinLogo.jpeg" width="320" alt="Logo">
+	<img src="https://raw.githubusercontent.com/max-matinpalo/joblin/main/assets/JoblinLogo.jpeg" width="360" alt="Logo">
 </p>
 <br>
 
