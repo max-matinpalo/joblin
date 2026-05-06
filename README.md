@@ -13,7 +13,7 @@ Define and call worker functions like normal async functions.
 - **🚀 Performant**: Reuses the same worker thread/process for many tasks
 - **🔀 Multi-worker**: Easily scale by creating multiple workers
 - **🛡️ Robust**: Built-in error handling and job cleanup
-- **🪶 Small**: Zero dependencies, ~600 bytes (min+gzip)
+- **🪶 Small**: Zero dependencies, less than 1KB (min+gzip)
 - **💻 Environments**: Browsers and Node.js
 
 

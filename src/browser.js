@@ -1,36 +1,36 @@
 // @ts-nocheck
 
 const registry = {};
-
-/* Prevent duplicate listeners when register() is called more than once */
 let listening = false;
 
-/* 2. Narrow detection to Dedicated Workers only */
-const isWorker = typeof DedicatedWorkerGlobalScope !== "undefined" && self instanceof DedicatedWorkerGlobalScope;
+const hasWorkerScope = typeof DedicatedWorkerGlobalScope !== "undefined";
+const isWorker = hasWorkerScope && self instanceof DedicatedWorkerGlobalScope;
 
 export function register(handlers = {}) {
-	// 1. Validate: Ensure handlers is a valid object
-	if (!handlers || typeof handlers !== "object") throw new Error("register() expects an object of handlers");
+	// 1. Validate
+	if (!handlers || typeof handlers !== "object") throw new Error("register() expects an object");
 
+	// 2. Initialize listener
 	if (isWorker && !listening) {
 		listening = true;
 		self.addEventListener("message", async (event) => {
-			const { id, type, payload } = event.data || {};
+			const { id, type, args = [] } = event.data || {};
 			if (!id || !type) return;
 
 			try {
 				const handler = registry[type];
 				if (typeof handler !== "function") throw new Error(`Task "${type}" not found`);
 
-				const result = await handler(payload);
+				const result = await handler(...args);
 				self.postMessage({ id, result });
 			} catch (err) {
-				const message = err instanceof Error ? err.message : String(err || "Worker task failed");
+				const message = err instanceof Error ? err.message : String(err || "Task failed");
 				self.postMessage({ id, error: message });
 			}
 		});
 	}
 
+	// 3. Register handlers
 	for (const [name, handler] of Object.entries(handlers)) {
 		if (typeof handler === "function") registry[name] = handler;
 	}
@@ -42,22 +42,15 @@ export function setup(path) {
 
 	const jobs = new Map();
 	const worker = new Worker(path, { type: "module" });
-	/*
-	const worker = typeof path === "function"
-	? path()
-	: path?.postMessage
-		? path
-		: new Worker(path, { type: "module" });
-	*/
 
-	const rejectJobs = (error) => {
+	function rejectJobs(error) {
 		for (const job of jobs.values()) job.reject(error);
 		jobs.clear();
-	};
+	}
 
+	// 1. Handle incoming messages
 	worker.addEventListener("message", (event) => {
 		const { id, result, error } = event.data || {};
-
 		const job = jobs.get(id);
 		if (!job) return;
 
@@ -66,28 +59,27 @@ export function setup(path) {
 		else job.resolve(result);
 	});
 
-	// 3. Mark destroyed on error to prevent future calls from hanging
+	// 2. Handle global errors (surgical logging only)
 	worker.addEventListener("error", (event) => {
-		destroyed = true;
-		rejectJobs(new Error(event.message || "Worker error"));
+		console.error("Worker Runtime Error:", event.message);
 	});
 
 	worker.addEventListener("messageerror", () => {
-		rejectJobs(new Error("Worker message serialization failed"));
+		console.error("Worker Serialization Error");
 	});
 
-	const terminate = () => {
+	// 3. Handle intentional termination
+	function terminate() {
 		destroyed = true;
 		rejectJobs(new Error("Worker terminated"));
 		worker.terminate();
-	};
+	}
 
+	// 4. Create worker proxy
 	return new Proxy({}, {
 		get(_, prop) {
 			if (prop === "terminate") return terminate;
 			if (prop === "worker") return worker;
-
-			/* Prevents the proxy from being treated as a Promise */
 			if (prop === "then") return undefined;
 
 			if (prop in worker) {
@@ -97,14 +89,14 @@ export function setup(path) {
 
 			if (typeof prop !== "string") return undefined;
 
-			return (payload = {}) => new Promise((resolve, reject) => {
+			return (...args) => new Promise((resolve, reject) => {
 				if (destroyed) return reject(new Error("Worker terminated"));
 
 				const id = String(++jobId);
 				jobs.set(id, { resolve, reject });
 
 				try {
-					worker.postMessage({ id, type: prop, payload });
+					worker.postMessage({ id, type: prop, args });
 				} catch (err) {
 					jobs.delete(id);
 					reject(err);
@@ -112,7 +104,7 @@ export function setup(path) {
 			});
 		},
 		set(_, prop, value) {
-			if (!(prop in worker)) return false;
+			if (!(prop in worker)) return true;
 			worker[prop] = value;
 			return true;
 		}

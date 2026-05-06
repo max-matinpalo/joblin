@@ -1,18 +1,18 @@
 {
 	"name": "joblin",
-	"version": "0.5.3",
+	"version": "0.6.1",
 	"description": "Multicore JavaScript made simple.",
 	"author": "Max Matinpalo",
 	"type": "module",
 	"license": "MIT",
-	"main": "./src/node.js",
+	"main": "./src/node-threads.js",
 	"exports": {
 		".": {
-			"default": "./src/browser.js",
+			"node": "./src/node-threads.js",
 			"browser": "./src/browser.js",
-			"node": "./src/node-threads.js"
+			"default": "./src/browser.js"
 		},
-		"./node-thread": "./src/node-thread.js",
+		"./node-threads": "./src/node-threads.js",
 		"./node-process": "./src/node-process.js"
 	},
 	"repository": {

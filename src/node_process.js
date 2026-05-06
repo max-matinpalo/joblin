@@ -9,24 +9,23 @@ export function register(handlers = {}) {
 		throw new Error("register() expects an object");
 	}
 
-	// 2. Helper for IPC
 	const send = (message) => {
 		if (!process.send || !process.connected) return;
 		process.send(message);
 	};
 
-	// 3. Init listener
+	// 2. Init listener
 	if (process.send && !listening) {
 		listening = true;
 		process.on("message", async (data) => {
-			const { id, type, payload } = data || {};
+			const { id, type, args = [] } = data || {};
 			if (!id || !type) return;
 
 			try {
 				const handler = registry[type];
 				if (typeof handler !== "function") throw new Error(`Task "${type}" not found`);
 
-				const result = await handler(payload);
+				const result = await handler(...args);
 				send({ id, result });
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err || "Process task failed");
@@ -35,21 +34,17 @@ export function register(handlers = {}) {
 		});
 	}
 
-	// 4. Register handlers
 	for (const [name, handler] of Object.entries(handlers)) {
 		if (typeof handler === "function") registry[name] = handler;
 	}
 }
 
-/**
- * @param {string|URL} path - Use new URL("./process.js", import.meta.url)
- */
 export function setup(path) {
 	let jobId = 0;
 	let destroyed = false;
 	const jobs = new Map();
 
-	// 1. Fork with advanced serialization
+	// 1. Fork
 	const child = fork(path, { serialization: "advanced" });
 
 	const rejectJobs = (error) => {
@@ -83,22 +78,17 @@ export function setup(path) {
 	child.on("exit", (code, signal) => {
 		if (destroyed) return;
 		destroyed = true;
-
-		const msg = signal
-			? `Process exited with signal ${signal}`
-			: code === 0 ? "Process exited" : `Process exited with code ${code}`;
-
+		const msg = signal ? `Exit signal ${signal}` : code === 0 ? "Exited" : `Exit code ${code}`;
 		rejectJobs(new Error(msg));
 	});
 
-	// 4. Termination logic
 	const terminate = () => {
 		destroyed = true;
 		rejectJobs(new Error("Process terminated"));
 		child.kill();
 	};
 
-	// 5. Proxy setup
+	// 4. Proxy setup
 	return new Proxy({}, {
 		get(_, prop) {
 			if (prop === "terminate") return terminate;
@@ -112,15 +102,14 @@ export function setup(path) {
 
 			if (typeof prop !== "string") return undefined;
 
-			return (payload = {}) => new Promise((resolve, reject) => {
+			return (...args) => new Promise((resolve, reject) => {
 				if (destroyed) return reject(new Error("Process terminated"));
 
 				const id = String(++jobId);
 				jobs.set(id, { resolve, reject });
 
-				// 6. Robust sending
 				try {
-					child.send({ id, type: prop, payload }, (err) => {
+					child.send({ id, type: prop, args }, (err) => {
 						if (!err) return;
 						jobs.delete(id);
 						reject(err);
@@ -132,7 +121,7 @@ export function setup(path) {
 			});
 		},
 		set(_, prop, value) {
-			if (!(prop in child)) return false;
+			if (!(prop in child)) return true;
 			child[prop] = value;
 			return true;
 		}
