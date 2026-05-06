@@ -10,7 +10,7 @@
 		".": {
 			"default": "./src/browser.js",
 			"browser": "./src/browser.js",
-			"node": "./src/node-thread.js"
+			"node": "./src/node-threads.js"
 		},
 		"./node-thread": "./src/node-thread.js",
 		"./node-process": "./src/node-process.js"

@@ -1,12 +1,16 @@
-import { Worker, isMainThread, parentPort } from "worker_threads";
+import { Worker, isMainThread, parentPort } from "node:worker_threads";
 
 const registry = {};
 let listening = false;
 
-export function register(...handlers) {
+export function register(handlers = {}) {
+	// 1. Validate: Ensure handlers is a plain object
+	if (!handlers || typeof handlers !== "object" || Array.isArray(handlers)) {
+		throw new Error("register() expects an object");
+	}
 
-	// 1. Setup listener
-	if (!isMainThread && !listening && parentPort) {
+	// 2. Initialize listener if in worker context with parentPort available
+	if (!isMainThread && parentPort && !listening) {
 		listening = true;
 		parentPort.on("message", async (data) => {
 			const { id, type, payload } = data || {};
@@ -19,43 +23,38 @@ export function register(...handlers) {
 				const result = await handler(payload);
 				parentPort.postMessage({ id, result });
 			} catch (err) {
-				parentPort.postMessage({ id, error: err.message || "Worker task failed" });
+				const msg = err instanceof Error ? err.message : String(err || "Worker task failed");
+				parentPort.postMessage({ id, error: msg });
 			}
 		});
 	}
 
-	// 2. Register handlers
-	for (const handler of handlers) {
-		if (typeof handler !== "function") continue;
-
-		if (!handler.name) {
-			console.warn("Ignoring anonymous function in register");
-			continue;
-		}
-
-		registry[handler.name] = handler;
+	// 3. Register handler functions
+	for (const [name, handler] of Object.entries(handlers)) {
+		if (typeof handler === "function") registry[name] = handler;
 	}
 }
 
+/**
+ * @param {string|URL} path - Use new URL("./worker.js", import.meta.url) for reliability
+ */
 export function setup(path) {
 	let jobId = 0;
 	let destroyed = false;
-
-	// 1. Initialize
 	const jobs = new Map();
+
+	// 1. Initialize worker
 	const worker = new Worker(path);
 
-	// 2. Setup job rejection
-	function rejectJobs(error) {
+	const rejectJobs = (error) => {
 		for (const job of jobs.values()) job.reject(error);
 		jobs.clear();
-	}
+	};
 
-	// 3. Handle messages
+	// 2. Handle incoming messages
 	worker.on("message", (data) => {
 		const { id, result, error } = data || {};
 		const job = jobs.get(id);
-
 		if (!job) return;
 
 		jobs.delete(id);
@@ -63,21 +62,30 @@ export function setup(path) {
 		else job.resolve(result);
 	});
 
-	// 4. Handle errors
-	worker.on("error", rejectJobs);
-
-	worker.on("exit", (code) => {
-		if (code !== 0) rejectJobs(new Error(`Worker stopped with exit code ${code}`));
+	// 3. Handle errors and cleanup
+	worker.on("error", (err) => {
+		destroyed = true;
+		rejectJobs(err || new Error("Worker error"));
 	});
 
-	// 5. Setup termination
-	async function terminate() {
+	worker.on("messageerror", () => rejectJobs(new Error("Serialization failed")));
+
+	worker.on("exit", (code) => {
+		if (destroyed) return;
+		destroyed = true;
+
+		const msg = code === 0 ? "Worker exited" : `Worker exited with code ${code}`;
+		rejectJobs(new Error(msg));
+	});
+
+	// 4. Define termination
+	const terminate = () => {
 		destroyed = true;
 		rejectJobs(new Error("Worker terminated"));
-		await worker.terminate();
-	}
+		return worker.terminate();
+	};
 
-	// 6. Return proxy
+	// 5. Return proxy
 	return new Proxy({}, {
 		get(_, prop) {
 			if (prop === "terminate") return terminate;
@@ -96,7 +104,13 @@ export function setup(path) {
 
 				const id = String(++jobId);
 				jobs.set(id, { resolve, reject });
-				worker.postMessage({ id, type: prop, payload });
+
+				try {
+					worker.postMessage({ id, type: prop, payload });
+				} catch (err) {
+					jobs.delete(id);
+					reject(err);
+				}
 			});
 		},
 		set(_, prop, value) {
