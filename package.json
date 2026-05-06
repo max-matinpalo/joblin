@@ -1,0 +1,33 @@
+{
+	"name": "joblin",
+	"version": "0.2.0",
+	"description": "Multi-core JavaScript, made simple.",
+	"author": "Max Matinpalo",
+	"type": "module",
+	"license": "MIT",
+	"main": "./src/node.js",
+	"exports": {
+		".": {
+			"default": "./src/browser.js",
+			"browser": "./src/browser.js",
+			"node": "./src/node-thread.js"
+		},
+		"./node-thread": "./src/node-thread.js",
+		"./node-process": "./src/node-process.js"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/max-matinpalo/joblin.git"
+	},
+	"keywords": [
+		"worker",
+		"web-worker",
+		"worker-threads",
+		"multi-core",
+		"parallel",
+		"async",
+		"node",
+		"browser",
+		"bun"
+	]
+}
